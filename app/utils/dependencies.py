@@ -74,22 +74,33 @@ async def get_current_user(
     return user
 
 
+from app.models.enums import Role
+
 async def require_admin(current_user: User = Depends(get_current_user)) -> User:
     """
-    Verificar que el usuario actual sea ADMIN
-    
-    Dependency para endpoints solo para administradores
-    
-    Raises:
-        HTTPException 403: Si el usuario no es ADMIN
+    Verificar que el usuario actual sea ADMIN o SUPERADMIN
     """
-    if current_user.role != "ADMIN":
+    if current_user.role not in [Role.ADMIN, Role.SUPERADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos de administrador"
         )
     
     return current_user
+
+
+async def require_superadmin(current_user: User = Depends(get_current_user)) -> User:
+    """
+    Verificar que el usuario actual sea SUPERADMIN
+    """
+    if current_user.role != Role.SUPERADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo el SUPERADMIN puede realizar esta acción"
+        )
+    
+    return current_user
+
 
 
 async def get_current_user_optional(

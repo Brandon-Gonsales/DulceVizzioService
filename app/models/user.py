@@ -1,32 +1,35 @@
-"""
-Modelo de Usuario - MongoDB con Beanie
-"""
-
-from beanie import Document, Indexed
+from beanie import Indexed
 from pydantic import EmailStr, Field
-from datetime import datetime
 from typing import Optional
+from datetime import datetime
+from .base import BaseDocument
+from .enums import Role
 
-
-class User(Document):
+class User(BaseDocument):
     """
     Modelo de Usuario
     
     Roles:
-    - ADMIN: Acceso completo a la plataforma
-    - USER: Estudiante con acceso limitado a cursos asignados
+    - SUPERADMIN: Propietario, acceso total.
+    - ADMIN: Administrador del sistema.
+    - MODERATOR: Moderadora de comunidad (VIP).
+    - USER: Estudiante.
     """
     
     email: Indexed(EmailStr, unique=True)  # Email único e indexado
-    username: Optional[Indexed(str, unique=True)] = None  # Username opcional pero único
-    password_hash: str  # Contraseña hasheada con bcrypt
+    username: Indexed(str, unique=True) = None
     full_name: str
-    role: str = "USER"  # "ADMIN" | "USER"
-    is_active: bool = True
-    avatar_url: Optional[str] = None
+    password_hash: str  # Contraseña hasheada con bcrypt
+
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    role: Role = Role.USER  # Ahora usa el Enum
+    is_active: bool = True
+
+    avatar_url: Optional[str] = None
+    phone_number: Optional[str] = None
+    birth_date: Optional[datetime] = None
+    
+    # created_at y updated_at ahora vienen de BaseDocument
     
     class Settings:
         name = "users"  # Nombre de la colección en MongoDB

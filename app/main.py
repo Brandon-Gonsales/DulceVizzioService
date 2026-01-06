@@ -7,6 +7,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.database import connect_to_mongo, close_mongo_connection
@@ -45,6 +48,11 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# Configurar Rate Limiting
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 
 # Configurar CORS
 app.add_middleware(
@@ -78,13 +86,13 @@ async def health_check():
 
 
 # Registrar routers
-from app.routers import auth
+from app.routers import auth, users
 
 app.include_router(auth.router)
+app.include_router(users.router)
 
 # TODO: Registrar más routers aquí
-# from app.routers import users, courses, enrollments, memberships, comments
-# app.include_router(users.router)
+# from app.routers import courses, enrollments, memberships, comments
 # app.include_router(courses.router)
 # app.include_router(enrollments.router)
 # app.include_router(memberships.router)

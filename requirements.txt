@@ -1,13 +1,38 @@
-# Requisitos actualizados para el proyecto FastAPI (versiones más recientes)
+# ===================================
+# DulceVizzio Backend - Requirements
+# ===================================
 
-fastapi>=0.115.0
-uvicorn[standard]>=0.32.0
-pydantic>=2.10.0
-pydantic-settings>=2.6.0
-motor>=3.6.0
-beanie>=1.27.0
-python-multipart>=0.0.20
-email-validator>=2.2.0
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
-cloudinary>=1.41.0
+# Framework Web
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# Base de Datos - MongoDB + Beanie ODM
+motor==3.3.2
+beanie==1.24.0
+pymongo==4.6.1
+
+# Autenticación y Seguridad
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.1.2
+pydantic[email]==2.5.3
+pydantic-settings==2.1.0
+
+# Cloudinary (almacenamiento de imágenes)
+cloudinary==1.37.0
+
+# Variables de entorno
+python-dotenv==1.0.0
+
+# CORS y middleware
+email-validator==2.1.0
+
+# Utilidades
+python-dateutil==2.8.2
+
+# Rate Limiting (Seguridad)
+slowapi==0.1.9
+
+# Procesamiento de Imágenes
+Pillow==10.2.0

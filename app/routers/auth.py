@@ -3,52 +3,28 @@ Router de Autenticación
 Endpoints para login, registro y gestión de cuenta
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Request
+from typing import Optional
 
 from app.schemas.user_schema import (
-    UserCreate,
     UserLogin,
     TokenResponse,
     UserResponse,
     ChangePasswordSchema
 )
 from app.services.auth_service import auth_service
+from app.services.cloudinary_service import cloudinary_service
 from app.utils.dependencies import get_current_user
 from app.models.user import User
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserCreate):
-    """
-    Registrar un nuevo usuario
-    
-    - **email**: Email único del usuario
-    - **password**: Contraseña (mínimo 8 caracteres)
-    - **full_name**: Nombre completo
-    - **username**: Username opcional (único)
-    - **role**: "ADMIN" o "USER" (por defecto "USER")
-    
-    Retorna los datos del usuario creado (sin la contraseña)
-    """
-    user = await auth_service.register_user(user_data)
-    
-    return UserResponse(
-        id=str(user.id),
-        email=user.email,
-        full_name=user.full_name,
-        username=user.username,
-        role=user.role,
-        is_active=user.is_active,
-        avatar_url=user.avatar_url,
-        created_at=user.created_at,
-        updated_at=user.updated_at
-    )
+
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(credentials: UserLogin):
+async def login(request: Request, credentials: UserLogin):
     """
     Iniciar sesión
     
@@ -56,7 +32,14 @@ async def login(credentials: UserLogin):
     - **password**: Contraseña
     
     Retorna un token JWT para autenticación en endpoints protegidos
+    
+    **Rate Limit:** 5 intentos por 15 minutos por IP
     """
+    from app.main import limiter
+    
+    # Aplicar rate limit específico
+    limiter.limit("5/15minute")(login)
+    
     return await auth_service.login(credentials)
 
 
@@ -70,44 +53,32 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
     return await auth_service.get_current_user_info(current_user)
 
 
-@router.put("/me", response_model=UserResponse)
-async def update_current_user(
-    full_name: str = None,
-    username: str = None,
-    avatar_url: str = None,
+@router.patch("/me/avatar", response_model=UserResponse)
+async def update_my_avatar(
+    file: UploadFile = File(...),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Actualizar perfil del usuario autenticado
+    Actualizar mi foto de perfil
     
-    Permite actualizar:
-    - **full_name**: Nombre completo
-    - **username**: Username (debe ser único)
-    - **avatar_url**: URL de avatar
+    Permite al usuario subir una nueva imagen de perfil.
     """
-    # Verificar si el username está disponible (si se proporcionó)
-    if username and username != current_user.username:
-        existing = await User.find_one(User.username == username)
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El username ya está en uso"
-            )
-        current_user.username = username
+    # Subir imagen usando el servicio
+    avatar_url = await cloudinary_service.upload_image(file, folder="avatars")
     
-    # Actualizar campos
-    if full_name:
-        current_user.full_name = full_name
-    if avatar_url is not None:  # Permitir cadena vacía para borrar avatar
-        current_user.avatar_url = avatar_url
-    
+    current_user.avatar_url = avatar_url
+    current_user.updated_by = str(current_user.id)
     await current_user.save()
     
-    return await auth_service.get_current_user_info(current_user)
+    return current_user
 
 
-@router.put("/change-password")
+
+
+
+@router.patch("/change-password")
 async def change_password(
+    request: Request,
     password_data: ChangePasswordSchema,
     current_user: User = Depends(get_current_user)
 ):
@@ -117,7 +88,14 @@ async def change_password(
     - **current_password**: Contraseña actual
     - **new_password**: Nueva contraseña (mínimo 8 caracteres)
     - **confirm_password**: Confirmación de nueva contraseña
+    
+    **Rate Limit:** 3 intentos por hora por usuario
     """
+    from app.main import limiter
+    
+    # Aplicar rate limit específico por usuario
+    limiter.limit("3/hour")(change_password)
+    
     return await auth_service.change_password(
         user=current_user,
         current_password=password_data.current_password,

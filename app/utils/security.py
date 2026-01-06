@@ -12,31 +12,29 @@ from app.config import settings
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
+import hashlib
+
 def hash_password(password: str) -> str:
     """
-    Hash de contraseña usando bcrypt
+    Hash de contraseña usando SHA-256 + bcrypt.
     
-    Args:
-        password: Contraseña en texto plano
-        
-    Returns:
-        Hash de la contraseña
+    1. Pre-hasheamos con SHA-256 para obtener un string de longitud fija (64 chars).
+    2. Hasheamos eso con Bcrypt.
+    
+    Esto evita el límite de 72 bytes de Bcrypt y permite contraseñas de cualquier longitud.
     """
-    return pwd_context.hash(password)
+    # Pre-hash para seguridad y compatibilidad de longitud
+    password_safe = hashlib.sha256(password.encode('utf-8')).hexdigest()
+    return pwd_context.hash(password_safe)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
-    Verificar contraseña contra hash
-    
-    Args:
-        plain_password: Contraseña en texto plano
-        hashed_password: Hash almacenado
-        
-    Returns:
-        True si coinciden, False en caso contrario
+    Verificar contraseña contra hash (con pre-hash SHA-256)
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    # Aplicar el mismo pre-hashing antes de verificar
+    password_safe = hashlib.sha256(plain_password.encode('utf-8')).hexdigest()
+    return pwd_context.verify(password_safe, hashed_password)
 
 
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
