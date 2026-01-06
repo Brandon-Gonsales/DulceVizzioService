@@ -22,8 +22,19 @@ class Settings(BaseSettings):
     # JWT Authentication
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 horas
-    #ACCESS_TOKEN_EXPIRE_MINUTES: int = 120  # 2 horas
+    ACCESS_TOKEN_EXPIRE_MINUTES_DEBUG: int = 1440  # 1 día para desarrollo
+    ACCESS_TOKEN_EXPIRE_MINUTES_PROD: int = 180    # 3 horas para producción
+    
+    @property
+    def ACCESS_TOKEN_EXPIRE_MINUTES(self) -> int:
+        """
+        Retorna el tiempo de expiración del token según el modo DEBUG
+        - DEBUG=True: 1 día (1440 minutos)
+        - DEBUG=False: 3 horas (180 minutos)
+        """
+        if self.DEBUG:
+            return self.ACCESS_TOKEN_EXPIRE_MINUTES_DEBUG
+        return self.ACCESS_TOKEN_EXPIRE_MINUTES_PROD
     
     
     # Cloudinary
