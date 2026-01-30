@@ -93,7 +93,7 @@ app.include_router(users.router)
 app.include_router(courses.router)
 app.include_router(lessons.router)
 app.include_router(materials.router)
-app.include_router(enrollments.router, prefix="/api") # Prefijo explícito para consistencia
+app.include_router(enrollments.router) # Prefijo explícito para consistencia
 
 # TODO: Registrar más routers aquí
 # from app.routers import enrollments, memberships, comments

@@ -17,7 +17,7 @@ from app.services.course_service import CourseService
 from app.utils.dependencies import get_current_user, get_current_admin, get_current_superadmin
 
 router = APIRouter(
-    prefix="/courses",
+    prefix="/api/courses",
     tags=["Courses"]
 )
 

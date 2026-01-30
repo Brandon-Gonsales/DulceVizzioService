@@ -1,0 +1,19 @@
+{
+  "id": "695cc40748b8077a89cb103e",
+  "revision_id": null,
+  "created_at": "2026-01-06T08:12:55",
+  "updated_at": "2026-01-06T10:55:46.561000",
+  "created_by": null,
+  "updated_by": "695cc40748b8077a89cb103e",
+  "is_deleted": false,
+  "deleted_at": null,
+  "email": "bgonsalescoronado@gmail.com",
+  "username": "Super_Administrador_Backend",
+  "full_name": "Brandon Gonsales Coronado",
+  "password_hash": "$2b$12$yScT49dF0m0fnSez1vuMLuFW9D1hArpN3hJbzUuF7kRz5RC3WvxLu",
+  "role": "SUPERADMIN",
+  "is_active": true,
+  "avatar_url": "https://res.cloudinary.com/dmxooones/image/upload/v1767696698/dulcevicio/avatars/jallfzycvrpz5uum6fyj.png",
+  "phone_number": "+59160984296",
+  "birth_date": "2002-03-20T00:00:00"
+}

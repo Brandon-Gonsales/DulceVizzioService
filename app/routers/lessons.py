@@ -17,6 +17,8 @@ from app.utils.dependencies import get_current_user, get_current_admin
 # from app.routers.courses import get_current_admin # YA NO NECESARIO
 
 router = APIRouter(
+    
+    prefix="/api",
     tags=["Lessons"]
 )
 

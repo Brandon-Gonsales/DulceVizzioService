@@ -10,6 +10,7 @@ from app.services.material_service import MaterialService
 from app.utils.dependencies import get_current_user, get_current_admin
 
 router = APIRouter(
+    prefix="/api",
     tags=["Materials"]
 )
 

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     # App
     APP_NAME: str = "DulceVicio API"
     APP_VERSION: str = "1.0.0"
-    DEBUG: bool = True
+    DEBUG: bool = False
     
     # MongoDB Atlas
     MONGODB_URL: str

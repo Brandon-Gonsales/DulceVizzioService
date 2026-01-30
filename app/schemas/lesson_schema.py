@@ -31,8 +31,6 @@ class LessonCreateSchema(LessonBase):
     """
     video_url: Optional[HttpUrl] = Field(None, description="URL del video (Bunny.net)")
     video_id: Optional[str] = Field(None, min_length=1, description="ID del video en Bunny.net")
-    video_id: Optional[str] = Field(None, min_length=1, description="ID del video en Bunny.net")
-
 
 class LessonUpdateSchema(BaseModel):
     """Schema para actualizar lección"""

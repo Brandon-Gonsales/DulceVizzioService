@@ -1,0 +1,21 @@
+{
+  "id": "6979392db66a9eb3ebedab17",
+  "revision_id": null,
+  "created_at": "2026-01-27T22:16:13.280000",
+  "updated_at": "2026-01-27T22:16:13.280000",
+  "created_by": "695cc40748b8077a89cb103e",
+  "updated_by": null,
+  "is_deleted": false,
+  "deleted_at": null,
+  "user_id": "695cecf6d3c63cf174c7f068",
+  "course_id": "6977fd2eb1241ae2597096eb",
+  "status": "ACTIVE",
+  "enrolled_at": "2026-01-27T22:16:13.280000",
+  "expires_at": "2027-01-27T22:16:13.280000",
+  "last_accessed_lesson_id": null,
+  "last_video_position_seconds": null,
+  "last_accessed_at": null,
+  "completed_at": null,
+  "certificate_url": null,
+  "notes": null
+}

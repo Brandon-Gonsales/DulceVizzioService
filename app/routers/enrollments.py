@@ -17,12 +17,13 @@ from app.services.enrollment_service import EnrollmentService
 from app.utils.dependencies import get_current_user, get_current_admin
 
 router = APIRouter(
+    prefix="/api/enrollments",
     tags=["Enrollments"]
 )
 
 # --- Endpoints de Usuario ---
 
-@router.get("/enrollments/me", response_model=EnrollmentListResponse)
+@router.get("/me", response_model=EnrollmentListResponse)
 async def get_my_enrollments(
     status: Optional[EnrollmentStatus] = Query(None, description="Filtrar por estado"),
     page: int = Query(1, ge=1, description="Número de página"),
@@ -45,7 +46,7 @@ async def get_my_enrollments(
     )
 
 
-@router.get("/enrollments", response_model=EnrollmentListResponse)
+@router.get("", response_model=EnrollmentListResponse)
 async def get_all_enrollments(
     user_id: Optional[str] = Query(None, description="Filtrar por ID de estudiante"),
     course_id: Optional[str] = Query(None, description="Filtrar por ID de curso"),
@@ -73,7 +74,7 @@ async def get_all_enrollments(
         filters=filters
     )
 
-@router.get("/enrollments/{enrollment_id}", response_model=EnrollmentResponseSchema)
+@router.get("/{enrollment_id}", response_model=EnrollmentResponseSchema)
 async def get_enrollment(
     enrollment_id: str,
     current_user: User = Depends(get_current_user)
@@ -84,7 +85,7 @@ async def get_enrollment(
     """
     return await EnrollmentService.get_enrollment_by_id(enrollment_id, current_user)
 
-@router.patch("/enrollments/{enrollment_id}/progress")
+@router.patch("/{enrollment_id}/progress")
 async def update_progress(
     enrollment_id: str,
     data: EnrollmentProgressUpdateSchema,
@@ -100,7 +101,7 @@ async def update_progress(
 
 # --- Endpoints Admin ---
 
-@router.post("/enrollments", response_model=EnrollmentResponseSchema, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=EnrollmentResponseSchema, status_code=status.HTTP_201_CREATED)
 async def create_enrollment(
     data: EnrollmentCreateSchema,
     current_user: User = Depends(get_current_admin)
@@ -114,7 +115,7 @@ async def create_enrollment(
     """
     return await EnrollmentService.create_enrollment(data, current_user)
 
-@router.patch("/enrollments/{enrollment_id}/extend", response_model=EnrollmentResponseSchema)
+@router.patch("/{enrollment_id}/extend", response_model=EnrollmentResponseSchema)
 async def extend_enrollment(
     enrollment_id: str,
     data: EnrollmentExtendSchema,
@@ -127,7 +128,7 @@ async def extend_enrollment(
     """
     return await EnrollmentService.extend_enrollment(enrollment_id, data, current_user)
 
-@router.delete("/enrollments/{enrollment_id}")
+@router.delete("/{enrollment_id}")
 async def cancel_enrollment(
     enrollment_id: str,
     current_user: User = Depends(get_current_admin)
