@@ -57,6 +57,8 @@ class CourseStatusUpdateSchema(BaseModel):
     status: CourseStatus
 
 
+from .lesson_schema import LessonResponseSchema
+
 class CourseResponseSchema(CourseBase):
     """Schema de respuesta de curso"""
     id: PydanticObjectId
@@ -65,6 +67,7 @@ class CourseResponseSchema(CourseBase):
     status: CourseStatus
     rating_average: Optional[float] = None
     enrollment_count: int
+    is_enrolled: bool = Field(default=False, description="Si el usuario actual está inscrito")
     
     # Campos calculados (requieren consulta async - se setean en el servicio)
     lessons_count: int = Field(default=0)
@@ -93,11 +96,40 @@ class CourseResponseSchema(CourseBase):
                 "status": "PUBLISHED",
                 "rating_average": 4.8,
                 "enrollment_count": 127,
+                "is_enrolled": False,
                 "lessons_count": 10,
                 "total_duration_hours": 2.5,
                 "created_at": "2026-01-20T10:00:00Z",
                 "published_at": "2026-01-22T10:00:00Z",
                 "updated_at": "2026-01-22T10:00:00Z"
+            }
+        }
+    )
+
+
+class CourseDetailResponseSchema(CourseResponseSchema):
+    """Schema detallado con lecciones para vista individual"""
+    lessons: List[LessonResponseSchema] = []
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": "507f1f77bcf86cd799439011",
+                "title": "Macarons Perfectos",
+                # ... campos heredados ...
+                "lessons": [
+                    {
+                        "id": "507f1f77bcf86cd799439012",
+                        "course_id": "507f1f77bcf86cd799439011",
+                        "title": "Introducción",
+                        "video_url": "https://video.bunnycdn.com/play/...",
+                        "is_preview": True,
+                        "order": 1,
+                        "materials": [],
+                        "created_at": "2026-01-20T10:00:00Z",
+                        "updated_at": "2026-01-20T10:00:00Z",
+                    }
+                ]
             }
         }
     )

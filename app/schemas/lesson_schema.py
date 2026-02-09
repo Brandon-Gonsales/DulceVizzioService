@@ -61,8 +61,8 @@ class LessonResponseSchema(LessonBase):
     """
     id: PydanticObjectId
     course_id: PydanticObjectId
-    video_url: HttpUrl
-    video_id: str
+    video_url: Optional[HttpUrl] = None
+    video_id: Optional[str] = None
     order: int
     materials: List = Field(default_factory=list, description="Materiales embebidos")
     

@@ -42,7 +42,7 @@ class EnrollmentService:
             Enrollment.status == EnrollmentStatus.ACTIVE
         )
         
-        if existing and existing.is_active_now():
+        if existing and await existing.is_active_now():
             raise HTTPException(
                 status_code=400,
                 detail="El usuario ya tiene una inscripción activa en este curso"
@@ -63,43 +63,107 @@ class EnrollmentService:
     @staticmethod
     async def get_user_enrollments(
         user_id: str,
+        search: Optional[str] = None,
         status: Optional[EnrollmentStatus] = None,
         page: int = 1,
         size: int = 10
     ) -> Dict[str, Any]:
-        """Obtener enrollments de un usuario con paginación"""
-        filters = [Enrollment.user_id == user_id]
+        """Obtener enrollments de un usuario con paginación y búsqueda"""
+        from bson import ObjectId
+        
+        # Convertir user_id string a ObjectId
+        try:
+            user_oid = ObjectId(user_id)
+        except Exception:
+            # Si el ID es inválido, retornar vacío
+            return {
+                "total": 0,
+                "page": page,
+                "per_page": size,
+                "total_pages": 0,
+                "data": []
+            }
+        
+        # Usar filtros de diccionario para mayor compatibilidad
+        query_filters = [{"user_id": user_oid}]
         
         if status:
-            filters.append(Enrollment.status == status)
+            query_filters.append({"status": status})
         
-        total = await Enrollment.find(*filters).count()
+        # Si hay búsqueda, necesitamos filtrar por título de curso
+        if search:
+            # Buscar cursos que coincidan
+            matching_courses = await Course.find(
+                {"title": {"$regex": search, "$options": "i"}}
+            ).to_list()
+            
+            if matching_courses:
+                course_ids = [c.id for c in matching_courses]
+                query_filters.append({"course_id": {"$in": course_ids}})
+            else:
+                # Si no hay cursos que coincidan, retornar vacío
+                return {
+                    "total": 0,
+                    "page": page,
+                    "per_page": size,
+                    "total_pages": 0,
+                    "data": []
+                }
+        
+        total = await Enrollment.find(*query_filters).count()
         
         # Calcular paginación
         total_pages = (total + size - 1) // size
         
         # Obtener items
-        items = await Enrollment.find(*filters)\
+        items = await Enrollment.find(*query_filters)\
             .sort("-enrolled_at")\
             .skip((page - 1) * size)\
             .limit(size)\
             .to_list()
+        
+        # Obtener IDs de cursos únicos
+        course_ids = list(set([e.course_id for e in items]))
+        
+        # Fetch cursos en una sola query
+        courses = await Course.find({"_id": {"$in": course_ids}}).to_list()
+        courses_dict = {c.id: c for c in courses}
+        
+        # Convertir enrollments a dicts e incluir curso
+        enrollments_data = []
+        for enrollment in items:
+            enrollment_dict = enrollment.model_dump(mode='json')
+            
+            # Agregar datos del curso si existe
+            course = courses_dict.get(enrollment.course_id)
+            if course:
+                enrollment_dict["course"] = {
+                    "id": str(course.id),
+                    "title": course.title,
+                    "slug": course.slug,
+                    "cover_image_url": str(course.cover_image_url) if course.cover_image_url else None,
+                    "price": course.price,
+                    "currency": course.currency
+                }
+            
+            enrollments_data.append(enrollment_dict)
         
         return {
             "total": total,
             "page": page,
             "per_page": size,
             "total_pages": total_pages,
-            "data": items
+            "data": enrollments_data
         }
 
     @staticmethod
     async def get_all_enrollments(
+        search: Optional[str] = None,
         page: int = 1,
         size: int = 10,
         filters: Dict[str, Any] = None
     ) -> Dict[str, Any]:
-        """Obtener todos los enrollments (Admin) con filtros y paginación"""
+        """Obtener todos los enrollments (Admin) con filtros, búsqueda y paginación"""
         query_filters = []
         
         if filters:
@@ -109,6 +173,45 @@ class EnrollmentService:
                 query_filters.append(Enrollment.course_id == filters["course_id"])
             if filters.get("status"):
                 query_filters.append(Enrollment.status == filters["status"])
+        
+        # Si hay búsqueda, buscar en usuarios Y cursos
+        if search:
+            matching_user_ids = []
+            matching_course_ids = []
+            
+            # Buscar usuarios por username o full_name
+            matching_users = await User.find(
+                {"$or": [
+                    {"username": {"$regex": search, "$options": "i"}},
+                    {"full_name": {"$regex": search, "$options": "i"}}
+                ]}
+            ).to_list()
+            matching_user_ids = [u.id for u in matching_users]
+            
+            # Buscar cursos por título
+            matching_courses = await Course.find(
+                {"title": {"$regex": search, "$options": "i"}}
+            ).to_list()
+            matching_course_ids = [c.id for c in matching_courses]
+            
+            # Filtrar enrollments que coincidan con usuarios O cursos
+            if matching_user_ids or matching_course_ids:
+                or_conditions = []
+                if matching_user_ids:
+                    or_conditions.append({"user_id": {"$in": matching_user_ids}})
+                if matching_course_ids:
+                    or_conditions.append({"course_id": {"$in": matching_course_ids}})
+                
+                query_filters.append({"$or": or_conditions})
+            else:
+                # Si no hay coincidencias, retornar vacío
+                return {
+                    "total": 0,
+                    "page": page,
+                    "per_page": size,
+                    "total_pages": 0,
+                    "data": []
+                }
             
         # Ejecutar query
         query = Enrollment.find(*query_filters)
@@ -120,13 +223,39 @@ class EnrollmentService:
             .skip((page - 1) * size)\
             .limit(size)\
             .to_list()
+        
+        # Obtener IDs de cursos únicos
+        course_ids = list(set([e.course_id for e in items]))
+        
+        # Fetch cursos en una sola query
+        courses = await Course.find({"_id": {"$in": course_ids}}).to_list()
+        courses_dict = {c.id: c for c in courses}
+        
+        # Convertir enrollments a dicts e incluir curso
+        enrollments_data = []
+        for enrollment in items:
+            enrollment_dict = enrollment.model_dump(mode='json')
+            
+            # Agregar datos del curso si existe
+            course = courses_dict.get(enrollment.course_id)
+            if course:
+                enrollment_dict["course"] = {
+                    "id": str(course.id),
+                    "title": course.title,
+                    "slug": course.slug,
+                    "cover_image_url": str(course.cover_image_url) if course.cover_image_url else None,
+                    "price": course.price,
+                    "currency": course.currency
+                }
+            
+            enrollments_data.append(enrollment_dict)
             
         return {
             "total": total,
             "page": page,
             "per_page": size,
             "total_pages": total_pages,
-            "data": items
+            "data": enrollments_data
         }
     
     @staticmethod

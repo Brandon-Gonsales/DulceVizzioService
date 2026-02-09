@@ -34,6 +34,22 @@ class EnrollmentExtendSchema(BaseModel):
     additional_days: int = Field(..., ge=1, le=3650, description="Días adicionales (máx 10 años)")
 
 
+class CourseEmbeddedSchema(BaseModel):
+    """
+    Schema simplificado de curso para embedder en enrollments.
+    Solo incluye campos esenciales para navegación y UI.
+    """
+    id: PydanticObjectId
+    title: str
+    slug: str
+    cover_image_url: Optional[HttpUrl] = None
+    price: float
+    currency: str = "USD"
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+
 class EnrollmentResponseSchema(BaseModel):
     """
     Schema de respuesta de enrollment.
@@ -42,6 +58,7 @@ class EnrollmentResponseSchema(BaseModel):
     id: PydanticObjectId
     user_id: PydanticObjectId
     course_id: PydanticObjectId
+    course: Optional[CourseEmbeddedSchema] = Field(None, description="Datos del curso (populated en servicio)")
     
     # Estado
     status: EnrollmentStatus

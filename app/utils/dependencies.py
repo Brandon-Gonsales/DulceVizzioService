@@ -12,7 +12,8 @@ from app.models.user import User
 from app.utils.security import decode_access_token
 
 # Esquema de autenticación Bearer
-security = HTTPBearer()
+# auto_error=False permite que el header sea opcional (para endpoints públicos)
+security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
@@ -26,6 +27,14 @@ async def get_current_user(
     Raises:
         HTTPException 401: Si el token es inválido o el usuario no existe
     """
+    # Verificar que se proporcionó el token
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token de autenticación requerido",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     token = credentials.credentials
     
     # Decodificar token

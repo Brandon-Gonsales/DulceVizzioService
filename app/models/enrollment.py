@@ -94,9 +94,10 @@ class Enrollment(BaseDocument):
             **kwargs
         )
     
-    def is_active_now(self) -> bool:
+    async def is_active_now(self) -> bool:
         """
         Verifica si la inscripción está activa en este momento.
+        Si está activa pero la fecha expiró, actualiza el estado a EXPIRED.
         
         Returns:
             bool: True si está activa y no expirada
@@ -104,7 +105,14 @@ class Enrollment(BaseDocument):
         if self.status != EnrollmentStatus.ACTIVE:
             return False
         
-        return datetime.utcnow() < self.expires_at
+        # Verificar fecha
+        if datetime.utcnow() >= self.expires_at:
+            # Expiró: Actualizar estado (Lazy Update)
+            self.status = EnrollmentStatus.EXPIRED
+            await self.save()
+            return False
+        
+        return True
     
     def remaining_days(self) -> int:
         """

@@ -53,12 +53,16 @@ class CourseService:
         difficulty: Optional[str] = None,
         status: Optional[str] = None,
         search: Optional[str] = None,
-        public_view: bool = False
+        current_user: Optional[User] = None
     ) -> Dict[str, Any]:
         """
-        Obtener lista paginada de cursos con filtros
+        Obtener lista paginada de cursos con filtros.
+        Calcula is_enrolled para cada curso según el usuario actual.
         """
         query_filters = [Course.is_deleted == False]
+        # Calcular vista pública basada en el usuario
+        is_admin = current_user and current_user.role in [Role.ADMIN, Role.SUPERADMIN]
+        public_view = not is_admin #si no es admin, entonces se activa la vista publica  
 
         if public_view:
             query_filters.append(Course.status == CourseStatus.PUBLISHED)
@@ -83,10 +87,41 @@ class CourseService:
         skip = (page - 1) * limit
         courses = await query.sort("-created_at").skip(skip).limit(limit).to_list()
         
-        # Ya no necesitamos enriquecer, los datos están en la DB
+        # Calcular is_enrolled para cada curso
+        if current_user:
+            from app.models.enrollment import Enrollment
+            
+            # Verificar si es admin (acceso total)
+            if current_user.role in [Role.ADMIN, Role.SUPERADMIN]:
+                # Admin tiene acceso a todo
+                for course in courses:
+                    course.is_enrolled = True
+            else:
+                # Usuario regular: obtener enrollments activos en UNA sola query
+                enrollments = await Enrollment.find({
+                    "user_id": current_user.id,
+                    "status": "ACTIVE"
+                }).to_list()
+                
+                # Crear set de course_ids para búsqueda O(1)
+                enrolled_course_ids = set()
+                for e in enrollments:
+                    if await e.is_active_now():
+                        enrolled_course_ids.add(e.course_id)
+                
+                # Marcar cursos inscritos
+                for course in courses:
+                    course.is_enrolled = course.id in enrolled_course_ids
+
+        # Convertir cursos a dicts e incluir is_enrolled manualmente
+        courses_data = []
+        for course in courses:
+            course_dict = course.model_dump(mode='json')
+            course_dict["is_enrolled"] = course.is_enrolled
+            courses_data.append(course_dict)
         
         return {
-            "data": courses,
+            "data": courses_data,
             "total": total,
             "page": page,
             "limit": limit,
@@ -94,8 +129,12 @@ class CourseService:
         }
 
     @staticmethod
-    async def get_course_by_slug(slug: str, public_view: bool = False) -> Course:
-        """Obtener curso por slug"""
+    async def get_course_by_slug(slug: str, current_user: Optional[User] = None) -> Dict[str, Any]:
+        """Obtener curso por slug con control de acceso híbrido"""
+        # Calcular vista pública basada en el usuario
+        is_admin = current_user and current_user.role in [Role.ADMIN, Role.SUPERADMIN]
+        public_view = not is_admin
+
         # Usar filtros por diccionario para evitar problemas con Beanie Indexed fields
         query_filters = [{"slug": slug}, {"is_deleted": False}]
         
@@ -103,19 +142,47 @@ class CourseService:
             query_filters.append({"status": CourseStatus.PUBLISHED})
             
         course = await Course.find_one(*query_filters)
-        
-        if not course and not public_view:
-            try:
-                from bson import ObjectId
-                if ObjectId.is_valid(slug):
-                    course = await Course.find_one({"_id": ObjectId(slug)}, {"is_deleted": False})
-            except:
-                pass
 
         if not course:
             raise HTTPException(status_code=404, detail="Curso no encontrado")
         
-        return course
+        # Verificar inscripción y setear is_enrolled
+        if current_user:
+            from app.models.enrollment import Enrollment
+            # Verificar si es admin (acceso total)
+            if current_user.role in [Role.ADMIN, Role.SUPERADMIN]:
+                course.is_enrolled = True
+            else:
+                # Verificar si tiene inscripción activa
+                enrollment = await Enrollment.find_one({
+                    "user_id": current_user.id,
+                    "course_id": course.id,
+                    "status": "ACTIVE"
+                })
+                if enrollment and await enrollment.is_active_now():
+                    course.is_enrolled = True
+        
+        # --- NUEVO: Obtener y filtar Lecciones ---
+        from app.models.lesson import Lesson
+        
+        # 1. Obtener todas las lecciones del curso ordenadas
+        lessons = await Lesson.find({"course_id": course.id}).sort("order").to_list()
+        
+        # 2. Filtrar contenido sensible si NO está inscrito
+        if not course.is_enrolled:
+            for lesson in lessons:
+                # Si NO es preview, ocultar video y materiales
+                if not lesson.is_preview:
+                    lesson.video_url = None
+                    lesson.video_id = None
+                    lesson.materials = []
+        
+        # 3. Convertir curso a dict y agregar lecciones
+        course_dict = course.model_dump(mode='json')
+        course_dict["is_enrolled"] = course.is_enrolled  # Incluir manualmente (exclude=True en modelo)
+        course_dict["lessons"] = [lesson.model_dump(mode='json') for lesson in lessons]
+
+        return course_dict
 
     @staticmethod
     async def create_course(data: CourseCreateSchema, user: User) -> Course:

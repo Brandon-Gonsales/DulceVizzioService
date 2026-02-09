@@ -17,9 +17,12 @@ class LessonService:
     @staticmethod
     async def get_lessons_by_course(course_id: str, user: Optional[User] = None) -> List[Lesson]:
         """
-        Obtener lecciones de un curso.
-        Ahora consulta directamente la colección lessons por course_id
+        Obtener lecciones de un curso con control de acceso.
+        - Usuarios no inscritos: Solo ven metadata, videos bloqueados excepto preview
+        - Usuarios inscritos/admin: Ven todo el contenido
         """
+        from app.models.enrollment import Enrollment
+        
         course = await Course.get(course_id)
         if not course or course.is_deleted:
             raise HTTPException(status_code=404, detail="Curso no encontrado")
@@ -28,17 +31,82 @@ class LessonService:
         is_admin = user and user.role in [Role.ADMIN, Role.SUPERADMIN]
         if course.status != CourseStatus.PUBLISHED and not is_admin:
              raise HTTPException(status_code=404, detail="Curso no encontrado")
+        
+        # Verificar inscripción
+        has_access = False
+        if user:
+            if is_admin:
+                has_access = True
+            else:
+                # Buscar enrollment activo
+                enrollment = await Enrollment.find_one({
+                    "user_id": user.id,
+                    "course_id": course.id,
+                    "status": "ACTIVE"
+                })
+                if enrollment and await enrollment.is_active_now():
+                    has_access = True
              
         # Consultar lessons por course_id
         lessons = await Lesson.find({"course_id": course.id}).sort("+order").to_list()
+        
+        # Si no tiene acceso, limpiar contenido sensible de lecciones no-preview
+        if not has_access:
+            for lesson in lessons:
+                if not lesson.is_preview:
+                    # Ocultar URLs de video y materiales
+                    lesson.video_url = None
+                    lesson.video_id = None
+                    lesson.materials = []
+        
         return lessons
 
     @staticmethod
     async def get_lesson_by_id(lesson_id: str, user: Optional[User] = None) -> Lesson:
-        """Obtener lección por ID"""
+        """
+        Obtener lección por ID con control de acceso.
+        Bloquea lecciones no-preview para usuarios no inscritos.
+        """
+        from app.models.enrollment import Enrollment
+        
         lesson = await Lesson.get(lesson_id)
         if not lesson:
             raise HTTPException(status_code=404, detail="Lección no encontrada")
+        
+        # Obtener el curso para verificar permisos
+        course = await Course.get(lesson.course_id)
+        if not course:
+            raise HTTPException(status_code=404, detail="Curso no encontrado")
+        
+        # Verificar acceso
+        has_access = False
+        is_admin = user and user.role in [Role.ADMIN, Role.SUPERADMIN]
+        
+        if is_admin:
+            has_access = True
+        elif lesson.is_preview:
+            # Las lecciones preview son públicas
+            has_access = True
+        elif user:
+            # Verificar enrollment
+            enrollment = await Enrollment.find_one({
+                "user_id": user.id,
+                "course_id": course.id,
+                "status": "ACTIVE"
+            })
+            if enrollment and await enrollment.is_active_now():
+                has_access = True
+        
+        # Si no tiene acceso a una lección no-preview, bloquear
+        if not has_access and not lesson.is_preview:
+            raise HTTPException(
+                status_code=403, 
+                detail="Debes estar inscrito en el curso para acceder a esta lección"
+            )
+        
+        # Si no tiene acceso pero es preview, limpiar igualmente por consistencia
+        if not has_access:
+            lesson.materials = []
             
         return lesson
 
@@ -131,9 +199,11 @@ class LessonService:
             
             # Recalcular order para todas
             for i, l in enumerate(all_lessons):
-                l.order = i + 1
-                l.updated_by = str(user.id)
-                await l.save()
+                # OPTIMIZACIÓN: Solo guardar si cambió el orden
+                if l.order != i + 1:
+                    l.order = i + 1
+                    l.updated_by = str(user.id)
+                    await l.save()
             
         return all_lessons
 

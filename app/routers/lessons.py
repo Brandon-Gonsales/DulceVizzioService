@@ -13,7 +13,7 @@ from app.schemas.lesson_schema import (
 )
 from app.services.lesson_service import LessonService
 from app.services.cloudinary_service import CloudinaryService
-from app.utils.dependencies import get_current_user, get_current_admin
+from app.utils.dependencies import get_current_user, get_current_admin, get_current_user_optional
 # from app.routers.courses import get_current_admin # YA NO NECESARIO
 
 router = APIRouter(
@@ -22,32 +22,33 @@ router = APIRouter(
     tags=["Lessons"]
 )
 
-# --- Endpoints Públicos ---
-
-@router.get("/courses/{course_id}/lessons", response_model=List[LessonResponseSchema])
-async def get_course_lessons(
-    course_id: str,
-    current_user: Optional[User] = Depends(get_current_user)
-):
-    """
-    Listar lecciones de un curso.
-    - Público: Metadata básica
-    - Estudiante inscrito: Acceso completo
-    """
-    return await LessonService.get_lessons_by_course(course_id, current_user)
 
 @router.get("/lessons/{lesson_id}", response_model=LessonResponseSchema)
 async def get_lesson(
     lesson_id: str,
-    current_user: Optional[User] = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
     Obtener detalle de una lección.
-    Verifica permisos si no es preview.
+    - Preview: Acceso público
+    - No preview: Solo usuarios inscritos
     """
     return await LessonService.get_lesson_by_id(lesson_id, current_user)
 
 # --- Endpoints Administrativos ---
+ 
+@router.get("/by-course/{course_id}", response_model=List[LessonResponseSchema])
+async def get_lessons_by_course(
+    course_id: str,
+    current_user: User = Depends(get_current_admin)
+):
+    """
+    Obtener lecciones de un curso (PARA ADMIN PANEL).
+    - Uso Interno / Gestión
+    - NO USAR PARA PUBLICO (Usar GET /courses/{slug})
+    """
+    # Como es admin, is_preview no importa, ve todo
+    return await LessonService.get_lessons_by_course(course_id, current_user)
 
 @router.post("/courses/{course_id}/lessons", response_model=LessonResponseSchema, status_code=status.HTTP_201_CREATED)
 async def create_lesson(

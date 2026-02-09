@@ -25,6 +25,7 @@ router = APIRouter(
 
 @router.get("/me", response_model=EnrollmentListResponse)
 async def get_my_enrollments(
+    search: Optional[str] = Query(None, description="Buscar por título de curso"),
     status: Optional[EnrollmentStatus] = Query(None, description="Filtrar por estado"),
     page: int = Query(1, ge=1, description="Número de página"),
     size: int = Query(10, ge=1, le=100, description="Items por página"),
@@ -34,45 +35,19 @@ async def get_my_enrollments(
     Obtener mis enrollments (cursos a los que estoy inscrito).
     
     Query params:
+    - search: Buscar por título de curso (opcional)
     - status: ACTIVE | EXPIRED | CANCELLED (opcional)
     - page: Página actual (default 1)
     - size: Items por página (default 10)
     """
     return await EnrollmentService.get_user_enrollments(
         user_id=str(current_user.id),
+        search=search,
         status=status,
         page=page,
         size=size
     )
 
-
-@router.get("", response_model=EnrollmentListResponse)
-async def get_all_enrollments(
-    user_id: Optional[str] = Query(None, description="Filtrar por ID de estudiante"),
-    course_id: Optional[str] = Query(None, description="Filtrar por ID de curso"),
-    status: Optional[EnrollmentStatus] = Query(None, description="Filtrar por estado"),
-    page: int = Query(1, ge=1, description="Número de página"),
-    size: int = Query(10, ge=1, le=100, description="Items por página"),
-    current_user: User = Depends(get_current_admin)
-):
-    """
-    Listar inscripciones (Admin).
-    
-    Permite filtrar por usuario, curso y estado.
-    """
-    filters = {
-        "user_id": user_id,
-        "course_id": course_id,
-        "status": status
-    }
-    # Eliminar claves con valor None
-    filters = {k: v for k, v in filters.items() if v is not None}
-    
-    return await EnrollmentService.get_all_enrollments(
-        page=page, 
-        size=size, 
-        filters=filters
-    )
 
 @router.get("/{enrollment_id}", response_model=EnrollmentResponseSchema)
 async def get_enrollment(
@@ -100,6 +75,37 @@ async def update_progress(
     return await EnrollmentService.update_progress(enrollment_id, data, current_user)
 
 # --- Endpoints Admin ---
+
+@router.get("", response_model=EnrollmentListResponse)
+async def get_all_enrollments(
+    search: Optional[str] = Query(None, description="Buscar por nombre de usuario o título de curso"),
+    user_id: Optional[str] = Query(None, description="Filtrar por ID de estudiante"),
+    course_id: Optional[str] = Query(None, description="Filtrar por ID de curso"),
+    status: Optional[EnrollmentStatus] = Query(None, description="Filtrar por estado"),
+    page: int = Query(1, ge=1, description="Número de página"),
+    size: int = Query(10, ge=1, le=100, description="Items por página"),
+    current_user: User = Depends(get_current_admin)
+):
+    """
+    Listar inscripciones (Admin).
+    
+    Permite filtrar por usuario, curso y estado.
+    Buscar por nombre de usuario o título de curso.
+    """
+    filters = {
+        "user_id": user_id,
+        "course_id": course_id,
+        "status": status
+    }
+    # Eliminar claves con valor None
+    filters = {k: v for k, v in filters.items() if v is not None}
+    
+    return await EnrollmentService.get_all_enrollments(
+        search=search,
+        page=page, 
+        size=size, 
+        filters=filters
+    )
 
 @router.post("", response_model=EnrollmentResponseSchema, status_code=status.HTTP_201_CREATED)
 async def create_enrollment(

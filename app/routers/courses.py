@@ -11,10 +11,11 @@ from app.schemas.course_schema import (
     CourseCreateSchema, 
     CourseUpdateSchema, 
     CourseResponseSchema, 
-    CourseStatusUpdateSchema
+    CourseStatusUpdateSchema,
+    CourseDetailResponseSchema
 )
 from app.services.course_service import CourseService
-from app.utils.dependencies import get_current_user, get_current_admin, get_current_superadmin
+from app.utils.dependencies import get_current_user, get_current_admin, get_current_superadmin, get_current_user_optional
 
 router = APIRouter(
     prefix="/api/courses",
@@ -33,21 +34,13 @@ async def get_courses(
     difficulty: Optional[str] = None,
     status: Optional[str] = None,
     search: Optional[str] = None,
-    current_user: Optional[User] = Depends(get_current_user) # Opcional para ver si es admin
+    current_user: Optional[User] = Depends(get_current_user_optional) # Opcional para acceso público
 ):
     """
     Listar cursos paginados.
-    - Público: Solo ve cursos PUBLISHED (y no eliminados).
+    - Usuario logeado o usuario sin logear: Solo ve cursos PUBLISHED (y no eliminados).
     - Admin: Puede filtrar por cualquier status.
     """
-    is_admin = current_user and current_user.role in [Role.ADMIN, Role.SUPERADMIN]
-    
-    # Si no es admin, forzar vista pública
-    public_view = not is_admin
-    
-    # Si es admin pero no especificó status, mostrar todos (o filtrar si especificó)
-    # Si es público, el servicio filtrará solo PUBLISHED
-    
     return await CourseService.get_courses(
         page=page, 
         limit=limit, 
@@ -55,19 +48,20 @@ async def get_courses(
         difficulty=difficulty, 
         status=status,
         search=search,
-        public_view=public_view
+        current_user=current_user
     )
 
-@router.get("/{slug}", response_model=CourseResponseSchema)
+@router.get("/{slug}", response_model=CourseDetailResponseSchema)
 async def get_course(
     slug: str,
-    current_user: Optional[User] = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_current_user_optional) # Opcional para acceso público
 ):
     """
     Obtener detalle de un curso por slug (o ID).
+    - usuario no logueado o usuario no inscrito: Solo ve metadatos y lecciones preview
+    - usuario inscrito o admin o superadmin: Ve todo el contenido
     """
-    is_admin = current_user and current_user.role in [Role.ADMIN, Role.SUPERADMIN]
-    return await CourseService.get_course_by_slug(slug, public_view=not is_admin)
+    return await CourseService.get_course_by_slug(slug, current_user=current_user)
 
 # --- Endpoints Administrativos ---
 

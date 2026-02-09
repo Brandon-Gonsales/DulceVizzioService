@@ -9,6 +9,8 @@ from datetime import datetime
 from .base import BaseDocument
 from .enums import CourseStatus, CourseDifficulty
 
+from .lesson import Lesson # Import for type hinting
+
 
 class CourseReview(BaseDocument):
     """
@@ -76,6 +78,9 @@ class Course(BaseDocument):
     enrollment_count: int = Field(default=0, description="Estudiantes inscritos")
     lessons_count: int = Field(default=0, description="Cantidad total de lecciones")
     total_duration_hours: float = Field(default=0.0, description="Horas totales de contenido")
+    
+    # Campo virtual (no se guarda en BD, se calcula en el servicio)
+    is_enrolled: bool = Field(default=False, exclude=True, description="Si el usuario actual está inscrito")
     
     # Propiedades calculadas eliminadas para permitir asignación directa desde el servicio
     async def get_lessons(self) -> List:
